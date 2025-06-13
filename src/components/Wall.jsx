@@ -44,17 +44,6 @@ const Wall = ({
   // Determine if this is a 100M wall based on ID
   const is100MWall = id?.includes("100m");
 
-  // Determine cursor type based on wall orientation
-  const getCursorType = () => {
-    if (id === "wall100m_1" || id === "wall100m_2") {
-      // Both 100M walls move in Z direction (north-south)
-      return "ns-resize";
-    } else {
-      // 50M walls - move in X direction (east-west)
-      return "ew-resize";
-    }
-  };
-
   const showWarning = (type, worldPosition) => {
     setCollisionInfo({ type });
     setWarningPosition(worldPosition.clone().add(new THREE.Vector3(0, 1, 0)));
@@ -138,7 +127,15 @@ const Wall = ({
       );
       if (intersects.length > 0) {
         setIsDragging(true);
-        gl.domElement.style.cursor = getCursorType();
+
+        // Set cursor based on wall movement direction
+        if (is100MWall && id === "wall100m_1") {
+          gl.domElement.style.cursor = "ns-resize"; // vertical movement
+        } else if (is100MWall) {
+          gl.domElement.style.cursor = "ew-resize"; // horizontal movement
+        } else {
+          gl.domElement.style.cursor = "ew-resize"; // 50M walls move horizontally
+        }
 
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
@@ -161,8 +158,18 @@ const Wall = ({
           true
         );
         setIsHovered(intersects.length > 0);
-        gl.domElement.style.cursor =
-          intersects.length > 0 ? getCursorType() : "default";
+
+        if (intersects.length > 0) {
+          if (is100MWall && id === "wall100m_1") {
+            gl.domElement.style.cursor = "ns-resize";
+          } else if (is100MWall) {
+            gl.domElement.style.cursor = "ew-resize";
+          } else {
+            gl.domElement.style.cursor = "ew-resize";
+          }
+        } else {
+          gl.domElement.style.cursor = "default";
+        }
         return;
       }
 
@@ -175,12 +182,11 @@ const Wall = ({
       raycaster.current.ray.intersectPlane(dragPlane.current, intersectPoint);
 
       let newPosition;
-      const maxOffset = is100MWall ? 2.7 : 3; // 10% less movement for 100M walls
+      const maxOffset = 3;
 
       if (is100MWall) {
-        // For 100M walls, both move in Z direction (north-south)
         if (id === "wall100m_1") {
-          // Wall between room1 and room2 - allow Z movement (north-south)
+          // Wall between room1 and room2 - allow Z movement (vertical)
           newPosition = new THREE.Vector3(
             currentPosition.x,
             currentPosition.y,
@@ -190,15 +196,15 @@ const Wall = ({
           const maxZ = position[2] + maxOffset;
           newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
         } else if (id === "wall100m_2") {
-          // Wall between lobby and living room - also allow Z movement (north-south)
+          // Wall between lobby and living room - allow X movement (horizontal)
           newPosition = new THREE.Vector3(
-            currentPosition.x,
+            intersectPoint.x,
             currentPosition.y,
-            intersectPoint.z
+            currentPosition.z
           );
-          const minZ = position[2] - maxOffset;
-          const maxZ = position[2] + maxOffset;
-          newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
+          const minX = position[0] - maxOffset;
+          const maxX = position[0] + maxOffset;
+          newPosition.x = Math.max(minX, Math.min(maxX, newPosition.x));
         }
       } else {
         // 50M walls - original behavior (X movement)
@@ -230,7 +236,19 @@ const Wall = ({
       if (isDragging) {
         setIsDragging(false);
         setCollisionInfo(null);
-        gl.domElement.style.cursor = isHovered ? getCursorType() : "default";
+
+        if (isHovered) {
+          if (is100MWall && id === "wall100m_1") {
+            gl.domElement.style.cursor = "ns-resize";
+          } else if (is100MWall) {
+            gl.domElement.style.cursor = "ew-resize";
+          } else {
+            gl.domElement.style.cursor = "ew-resize";
+          }
+        } else {
+          gl.domElement.style.cursor = "default";
+        }
+
         onMoveComplete?.(currentPosition);
       }
     };

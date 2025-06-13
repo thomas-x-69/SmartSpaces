@@ -12,7 +12,12 @@ import {
   updateRoomSize,
   updateRoomPosition,
 } from "../store/roomConfigs100MSlice";
-import { updateRoomCapacity } from "../store/humanSlice100M";
+import { updateRoomCapacity } from "../store/humanSlice";
+import {
+  WIDTH_MULTIPLIER_100M,
+  DEPTH_MULTIPLIER_100M,
+  AREA_DIVISOR_100M,
+} from "../constants/roomConstants100M";
 
 // Component Imports
 import House100M from "../components/House100M";
@@ -25,7 +30,7 @@ const HomeScene100M = forwardRef(
     const roomConfigs = useSelector(selectRoomConfigs100M);
     const dispatch = useDispatch();
 
-    // Wall positions for 100M home - completely independent of house model
+    // Wall positions for 100M home - 2 walls as specified
     const wallPositions = [
       {
         id: "wall100m_1",
@@ -48,6 +53,7 @@ const HomeScene100M = forwardRef(
     // Handle wall movement completion
     const handleWallMoveComplete = (wallId, finalPosition) => {
       // Only update room sizes/positions when walls are actually moved by user
+      // Not when house model is moved
       if (!isEditingRooms) return;
 
       console.log("Wall move complete:", { wallId, finalPosition });
@@ -55,16 +61,16 @@ const HomeScene100M = forwardRef(
       if (!wallConfig) return;
 
       if (wallId === "wall100m_1") {
-        // Wall between room1 and room2 - adjust these rooms
-        const movementDelta = (finalPosition.x - wallConfig.initialX) * 0.5;
+        // Wall between room1 and room2 - adjust these rooms VERTICALLY (depth)
+        const movementDelta = (finalPosition.z - wallConfig.initialZ) * 0.5;
 
         const newRoom1Size = [
-          Math.max(3, roomConfigs.ROOM1.size[0] - movementDelta),
-          roomConfigs.ROOM1.size[1],
+          roomConfigs.ROOM1.size[0], // width stays the same
+          Math.max(3, roomConfigs.ROOM1.size[1] - movementDelta), // depth changes
         ];
         const newRoom2Size = [
-          Math.max(3, roomConfigs.ROOM2.size[0] + movementDelta),
-          roomConfigs.ROOM2.size[1],
+          roomConfigs.ROOM2.size[0], // width stays the same
+          Math.max(3, roomConfigs.ROOM2.size[1] + movementDelta), // depth changes
         ];
 
         dispatch(
@@ -87,21 +93,30 @@ const HomeScene100M = forwardRef(
             newConfig: { area: newRoom1Size[0] * newRoom1Size[1] },
           })
         );
+        console.log("Updated Room1 capacity:", {
+          size: newRoom1Size,
+          area: newRoom1Size[0] * newRoom1Size[1],
+        });
+
         dispatch(
           updateRoomCapacity({
             roomName: "ROOM2",
             newConfig: { area: newRoom2Size[0] * newRoom2Size[1] },
           })
         );
+        console.log("Updated Room2 capacity:", {
+          size: newRoom2Size,
+          area: newRoom2Size[0] * newRoom2Size[1],
+        });
 
-        // Update positions
+        // Update Z positions with wall movement (vertical movement)
         dispatch(
           updateRoomPosition({
             roomName: "ROOM1",
             newPosition: [
-              roomConfigs.ROOM1.position[0] - movementDelta * 0.5,
+              roomConfigs.ROOM1.position[0],
               roomConfigs.ROOM1.position[1],
-              roomConfigs.ROOM1.position[2],
+              roomConfigs.ROOM1.position[2] - movementDelta * 0.5,
             ],
           })
         );
@@ -109,14 +124,14 @@ const HomeScene100M = forwardRef(
           updateRoomPosition({
             roomName: "ROOM2",
             newPosition: [
-              roomConfigs.ROOM2.position[0] + movementDelta * 0.5,
+              roomConfigs.ROOM2.position[0],
               roomConfigs.ROOM2.position[1],
-              roomConfigs.ROOM2.position[2],
+              roomConfigs.ROOM2.position[2] + movementDelta * 0.5,
             ],
           })
         );
       } else if (wallId === "wall100m_2") {
-        // Wall between lobby and living room
+        // Wall between lobby and living room - adjust horizontally (width)
         const movementDelta = (finalPosition.x - wallConfig.initialX) * 0.5;
 
         const newLobbySize = [
@@ -155,7 +170,7 @@ const HomeScene100M = forwardRef(
           })
         );
 
-        // Update positions
+        // Update X positions with wall movement (horizontal movement)
         dispatch(
           updateRoomPosition({
             roomName: "LOBBY",
@@ -181,8 +196,8 @@ const HomeScene100M = forwardRef(
 
     return (
       <>
-        {/* HOUSE 3D MODEL - Completely isolated group */}
-        <group position={[0, 0, 0]}>
+        {/* HOUSE 3D MODEL - Completely separate group */}
+        <group>
           <Suspense fallback={null}>
             <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
             <ambientLight intensity={0.2} />
@@ -207,7 +222,7 @@ const HomeScene100M = forwardRef(
               contactShadow={{ blur: 2, opacity: 0.5 }}
               shadowBias={-0.0015}
             >
-              {/* ONLY the house 3D model - its position changes don't affect anything else */}
+              {/* ONLY the house 3D model is in Stage - can be moved independently */}
               <House100M showCeiling={showCeiling} />
             </Stage>
 
@@ -222,9 +237,9 @@ const HomeScene100M = forwardRef(
           </Suspense>
         </group>
 
-        {/* ROOM LAYOUT SYSTEM - Completely independent at world coordinates */}
-        <group ref={ref} position={[0, 0, 0]}>
-          {/* Walls - using independent world coordinates */}
+        {/* ROOM PLANS - Completely independent group at world coordinates */}
+        <group ref={ref}>
+          {/* Walls - independent of house */}
           {wallPositions.map((wallProps) => (
             <Wall
               key={wallProps.id}
@@ -237,9 +252,9 @@ const HomeScene100M = forwardRef(
             />
           ))}
 
-          {/* Labels and occupancy - using consistent world coordinates */}
+          {/* Labels and occupancy - completely independent at world coordinates */}
           <RoomLabels100M />
-          {showOccupancy && <RoomOccupancy100M />}
+          {showOccupancy && <RoomOccupancy100M roomOccupants={{}} />}
         </group>
       </>
     );
