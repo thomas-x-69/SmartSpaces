@@ -29,17 +29,17 @@ const HomeScene100M = forwardRef(
     const wallPositions = [
       {
         id: "wall100m_1",
-        position: [12, -0.3, 5], // Between room1 and room2 area
+        position: [-13.2, -2.2, -2.2], // Between room1 and room2 area
         rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
-        scale: [0.75, 0.818, 0.9],
+        scale: [0.5, 0.818, 2.1],
         initialX: 12,
         initialZ: 5,
       },
       {
         id: "wall100m_2",
-        position: [0, -0.3, 8], // Between lobby and living room
-        rotation: [0, 0, 0],
-        scale: [0.75, 0.818, 0.9],
+        position: [-20.8, -2.2, -1.05], // Between room1 and room2 area
+        rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
+        scale: [1, 0.818, 1.8],
         initialX: 0,
         initialZ: 8,
       },
