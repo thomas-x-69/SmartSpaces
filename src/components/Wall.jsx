@@ -30,10 +30,12 @@ const Wall = ({
   const { scene: wallScene } = useGLTF(WALL_MODEL);
   const wallRef = useRef();
   const [isDragging, setIsDragging] = useState(false);
+  const [hasActuallyMoved, setHasActuallyMoved] = useState(false); // Track if wall actually moved during drag
   const [currentPosition, setCurrentPosition] = useState(
     new THREE.Vector3(...position)
   );
   const [initialPosition] = useState(new THREE.Vector3(...position)); // Track initial position
+  const dragStartPosition = useRef(new THREE.Vector3(...position)); // Position when drag started
   const raycaster = useRef(new THREE.Raycaster());
   const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
   const [isHovered, setIsHovered] = useState(false);
@@ -128,10 +130,12 @@ const Wall = ({
       );
       if (intersects.length > 0) {
         setIsDragging(true);
+        setHasActuallyMoved(false); // Reset movement flag
+        dragStartPosition.current.copy(currentPosition); // Store starting position
 
         // Set cursor based on wall movement direction
         if (is100MWall) {
-          gl.domElement.style.cursor = "ns-resize"; // Both 100M walls move vertically
+          gl.domElement.style.cursor = "ns-resize"; // Both 100M walls move vertically (Z direction)
         } else {
           gl.domElement.style.cursor = "ew-resize"; // 50M walls move horizontally
         }
@@ -179,30 +183,18 @@ const Wall = ({
       raycaster.current.ray.intersectPlane(dragPlane.current, intersectPoint);
 
       let newPosition;
-      const maxOffset = 3;
+      const maxOffset = 3; // Same as 50M home
 
       if (is100MWall) {
-        if (id === "wall100m_1") {
-          // Wall between room1 and room2 - allow Z movement (vertical)
-          newPosition = new THREE.Vector3(
-            currentPosition.x,
-            currentPosition.y,
-            intersectPoint.z
-          );
-          const minZ = position[2] - maxOffset;
-          const maxZ = position[2] + maxOffset;
-          newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
-        } else if (id === "wall100m_2") {
-          // Wall between lobby and living room - ALSO allow Z movement (vertical) like wall1
-          newPosition = new THREE.Vector3(
-            currentPosition.x,
-            currentPosition.y,
-            intersectPoint.z
-          );
-          const minZ = position[2] - maxOffset;
-          const maxZ = position[2] + maxOffset;
-          newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
-        }
+        // Both 100M walls move in Z direction (vertical)
+        newPosition = new THREE.Vector3(
+          currentPosition.x,
+          currentPosition.y,
+          intersectPoint.z
+        );
+        const minZ = position[2] - maxOffset;
+        const maxZ = position[2] + maxOffset;
+        newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
       } else {
         // 50M walls - original behavior (X movement)
         newPosition = new THREE.Vector3(
@@ -216,6 +208,15 @@ const Wall = ({
       }
 
       if (newPosition) {
+        // Check if wall has actually moved a significant amount from drag start
+        const movementDistance = newPosition.distanceTo(
+          dragStartPosition.current
+        );
+        if (movementDistance > 0.05) {
+          // Lower threshold to match 50M sensitivity
+          setHasActuallyMoved(true);
+        }
+
         const collision = checkObjectCollisions(newPosition);
         if (collision && !collisionInfo) {
           // Only show warning if not already showing
@@ -244,11 +245,13 @@ const Wall = ({
           gl.domElement.style.cursor = "default";
         }
 
-        // ONLY call onMoveComplete if wall actually moved from initial position
-        const threshold = 0.01;
-        if (currentPosition.distanceTo(initialPosition) > threshold) {
+        // ONLY call onMoveComplete if wall actually moved during the drag operation
+        if (hasActuallyMoved) {
           onMoveComplete?.(currentPosition);
         }
+
+        // Reset the movement flag
+        setHasActuallyMoved(false);
       }
     };
 
@@ -291,6 +294,7 @@ const Wall = ({
     position,
     is100MWall,
     id,
+    hasActuallyMoved,
   ]);
 
   useEffect(() => {

@@ -14,7 +14,11 @@ import {
 } from "../store/roomConfigs100MSlice";
 import { updateRoomCapacity } from "../store/humanSlice100M";
 
-// Component Imports
+import {
+  WIDTH_MULTIPLIER_100M,
+  DEPTH_MULTIPLIER_100M,
+  AREA_DIVISOR_100M,
+} from "../constants/roomConstants100M";
 import House100M from "../components/House100M";
 import RoomLabels100M from "../components/RoomLabels100M";
 import Wall from "../components/Wall";
@@ -25,7 +29,7 @@ const HomeScene100M = forwardRef(
     const roomConfigs = useSelector(selectRoomConfigs100M);
     const dispatch = useDispatch();
 
-    // Wall positions for 100M home - ORIGINAL positions
+    // Wall positions for 100M home - ORIGINAL positions (restored)
     const wallPositions = [
       {
         id: "wall100m_1",
@@ -37,7 +41,7 @@ const HomeScene100M = forwardRef(
       },
       {
         id: "wall100m_2",
-        position: [-20.8, -2.2, -1.05], // Between room1 and room2 area
+        position: [-20.8, -2.2, -1.05], // Between lobby and living room area
         rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
         scale: [1, 0.818, 1.8],
         initialX: -20.8,
@@ -45,25 +49,26 @@ const HomeScene100M = forwardRef(
       },
     ];
 
-    // Handle wall movement completion - ORIGINAL logic
+    // Handle wall movement completion - EXACTLY like 50M home mechanism
     const handleWallMoveComplete = (wallId, finalPosition) => {
       console.log("Wall move complete:", { wallId, finalPosition });
       const wallConfig = wallPositions.find((w) => w.id === wallId);
       if (!wallConfig) return;
 
-      if (wallId === "wall100m_1") {
-        // Wall between room1 and room2 - adjust these rooms VERTICALLY (depth)
-        const movementDelta = (finalPosition.z - wallConfig.initialZ) * 0.5;
+      const movementDelta = (finalPosition.z - wallConfig.initialZ) * 0.65;
 
+      if (wallId === "wall100m_1") {
+        // Calculate new dimensions - FIXED directional logic
         const newRoom1Size = [
-          roomConfigs.ROOM1.size[0], // width stays the same
-          Math.max(3, roomConfigs.ROOM1.size[1] - movementDelta), // depth changes
+          roomConfigs.ROOM1.size[0],
+          Math.max(3, 7.5 + movementDelta * 1.9), // Room1 increases when wall moves +Z
         ];
         const newRoom2Size = [
-          roomConfigs.ROOM2.size[0], // width stays the same
-          Math.max(3, roomConfigs.ROOM2.size[1] + movementDelta), // depth changes
+          roomConfigs.ROOM2.size[0],
+          Math.max(3, 6.75 - movementDelta * 1.9), // Room2 decreases when wall moves +Z
         ];
 
+        // Update sizes
         dispatch(
           updateRoomSize({
             roomName: "ROOM1",
@@ -77,37 +82,61 @@ const HomeScene100M = forwardRef(
           })
         );
 
-        // Update room capacities
+        // Update room capacities with new areas - same calculation as 50M
         dispatch(
           updateRoomCapacity({
             roomName: "ROOM1",
-            newConfig: { area: newRoom1Size[0] * newRoom1Size[1] },
+            newConfig: {
+              area:
+                (newRoom1Size[0] *
+                  WIDTH_MULTIPLIER_100M *
+                  newRoom1Size[1] *
+                  DEPTH_MULTIPLIER_100M) /
+                AREA_DIVISOR_100M,
+            },
           })
         );
         console.log("Updated Room1 capacity:", {
           size: newRoom1Size,
-          area: newRoom1Size[0] * newRoom1Size[1],
+          area:
+            (newRoom1Size[0] *
+              WIDTH_MULTIPLIER_100M *
+              newRoom1Size[1] *
+              DEPTH_MULTIPLIER_100M) /
+            AREA_DIVISOR_100M,
         });
 
         dispatch(
           updateRoomCapacity({
             roomName: "ROOM2",
-            newConfig: { area: newRoom2Size[0] * newRoom2Size[1] },
+            newConfig: {
+              area:
+                (newRoom2Size[0] *
+                  WIDTH_MULTIPLIER_100M *
+                  newRoom2Size[1] *
+                  DEPTH_MULTIPLIER_100M) /
+                AREA_DIVISOR_100M,
+            },
           })
         );
         console.log("Updated Room2 capacity:", {
           size: newRoom2Size,
-          area: newRoom2Size[0] * newRoom2Size[1],
+          area:
+            (newRoom2Size[0] *
+              WIDTH_MULTIPLIER_100M *
+              newRoom2Size[1] *
+              DEPTH_MULTIPLIER_100M) /
+            AREA_DIVISOR_100M,
         });
 
-        // Update Z positions with wall movement (vertical movement)
+        // Note: Adjust positions slightly so rooms grow/shrink from wall side, not center
         dispatch(
           updateRoomPosition({
             roomName: "ROOM1",
             newPosition: [
-              roomConfigs.ROOM1.position[0],
-              roomConfigs.ROOM1.position[1],
-              roomConfigs.ROOM1.position[2] - movementDelta * 0.5,
+              4.5,
+              -1.5,
+              -5 + movementDelta * 0.5, // Room1 position shifts to show growth from wall side
             ],
           })
         );
@@ -115,70 +144,102 @@ const HomeScene100M = forwardRef(
           updateRoomPosition({
             roomName: "ROOM2",
             newPosition: [
-              roomConfigs.ROOM2.position[0],
-              roomConfigs.ROOM2.position[1],
-              roomConfigs.ROOM2.position[2] + movementDelta * 0.5,
+              4.5,
+              -1.5,
+              2 + movementDelta * 0.5, // Room2 position shifts to show shrinking from wall side
             ],
           })
         );
       } else if (wallId === "wall100m_2") {
-        // Wall between lobby and living room - adjust VERTICALLY like wall1 (depth)
-        const movementDelta = (finalPosition.z - wallConfig.initialZ) * 0.5;
-
-        const newLobbySize = [
-          roomConfigs.LOBBY.size[0], // width stays the same
-          Math.max(4, roomConfigs.LOBBY.size[1] - movementDelta), // depth changes
-        ];
+        // Calculate new dimensions - FIXED directional logic
         const newLivingRoomSize = [
-          roomConfigs["LIVING ROOM"].size[0], // width stays the same
-          Math.max(4, roomConfigs["LIVING ROOM"].size[1] + movementDelta), // depth changes
+          roomConfigs["LIVING ROOM"].size[0],
+          Math.max(4, 12 + movementDelta * 2), // Living Room increases when wall moves +Z
+        ];
+        const newLobbySize = [
+          roomConfigs.LOBBY.size[0],
+          Math.max(4, 14 - movementDelta * 2), // Lobby decreases when wall moves +Z
         ];
 
-        dispatch(
-          updateRoomSize({
-            roomName: "LOBBY",
-            newSize: newLobbySize,
-          })
-        );
+        // Update sizes
         dispatch(
           updateRoomSize({
             roomName: "LIVING ROOM",
             newSize: newLivingRoomSize,
           })
         );
-
-        // Update room capacities
         dispatch(
-          updateRoomCapacity({
+          updateRoomSize({
             roomName: "LOBBY",
-            newConfig: { area: newLobbySize[0] * newLobbySize[1] },
+            newSize: newLobbySize,
           })
         );
+
+        // Update room capacities with new areas - same calculation as 50M
         dispatch(
           updateRoomCapacity({
             roomName: "LIVING ROOM",
-            newConfig: { area: newLivingRoomSize[0] * newLivingRoomSize[1] },
+            newConfig: {
+              area:
+                (newLivingRoomSize[0] *
+                  WIDTH_MULTIPLIER_100M *
+                  newLivingRoomSize[1] *
+                  DEPTH_MULTIPLIER_100M) /
+                AREA_DIVISOR_100M,
+            },
           })
         );
+        console.log("Updated Living Room capacity:", {
+          size: newLivingRoomSize,
+          area:
+            (newLivingRoomSize[0] *
+              WIDTH_MULTIPLIER_100M *
+              newLivingRoomSize[1] *
+              DEPTH_MULTIPLIER_100M) /
+            AREA_DIVISOR_100M,
+        });
 
-        // Update Z positions with wall movement (vertical movement like wall1)
+        dispatch(
+          updateRoomCapacity({
+            roomName: "LOBBY",
+            newConfig: {
+              area:
+                (newLobbySize[0] *
+                  WIDTH_MULTIPLIER_100M *
+                  newLobbySize[1] *
+                  DEPTH_MULTIPLIER_100M) /
+                AREA_DIVISOR_100M,
+            },
+          })
+        );
+        console.log("Updated Lobby capacity:", {
+          size: newLobbySize,
+          area:
+            (newLobbySize[0] *
+              WIDTH_MULTIPLIER_100M *
+              newLobbySize[1] *
+              DEPTH_MULTIPLIER_100M) /
+            AREA_DIVISOR_100M,
+        });
+
+        // Note: Adjust positions slightly so rooms grow/shrink from wall side, not center
         dispatch(
           updateRoomPosition({
-            roomName: "LOBBY",
+            roomName: "LIVING ROOM",
             newPosition: [
-              roomConfigs.LOBBY.position[0],
-              roomConfigs.LOBBY.position[1],
-              roomConfigs.LOBBY.position[2] - movementDelta * 0.5,
+              -5.9,
+              -1.5,
+              -5.5 + movementDelta * 0.5, // Living Room position shifts to show growth from wall side
             ],
           })
         );
         dispatch(
           updateRoomPosition({
-            roomName: "LIVING ROOM",
+            roomName: "LOBBY",
             newPosition: [
-              roomConfigs["LIVING ROOM"].position[0],
-              roomConfigs["LIVING ROOM"].position[1],
-              roomConfigs["LIVING ROOM"].position[2] + movementDelta * 0.5,
+              -5.9,
+              -1.5,
+              8 + movementDelta * 0.5, // Lobby position shifts to show shrinking from wall side
             ],
           })
         );

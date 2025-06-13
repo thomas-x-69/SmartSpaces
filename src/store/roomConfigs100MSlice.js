@@ -60,20 +60,39 @@ const roomConfigs100MSlice = createSlice({
       const { roomName, newSize } = action.payload;
       if (state[roomName]) {
         state[roomName].size = newSize;
-        // Update area when size changes
+        // Update area when size changes - calculate properly
         state[roomName].area = newSize[0] * newSize[1];
+
+        console.log(`Updated ${roomName} config:`, {
+          size: newSize,
+          area: state[roomName].area,
+          position: state[roomName].position,
+        });
       }
     },
     updateRoomPosition: (state, action) => {
       const { roomName, newPosition } = action.payload;
       if (state[roomName]) {
         state[roomName].position = newPosition;
+
+        console.log(`Updated ${roomName} position:`, {
+          position: newPosition,
+          size: state[roomName].size,
+          area: state[roomName].area,
+        });
       }
+    },
+    resetRoomConfigs: (state) => {
+      // Reset all rooms to initial state
+      Object.keys(state).forEach((roomName) => {
+        state[roomName] = { ...initialState[roomName] };
+      });
+      console.log("Reset all room configs to initial state");
     },
   },
 });
 
-export const { updateRoomSize, updateRoomPosition } =
+export const { updateRoomSize, updateRoomPosition, resetRoomConfigs } =
   roomConfigs100MSlice.actions;
 export const selectRoomConfigs100M = (state) => state.roomConfigs100M;
 export default roomConfigs100MSlice.reducer;

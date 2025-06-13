@@ -1,19 +1,24 @@
 // src/components/RoomLabels100M.jsx
 import { Text } from "@react-three/drei";
+import { useSelector } from "react-redux";
+import { selectRoomConfigs100M } from "../store/roomConfigs100MSlice";
 
 const RoomLabels100M = () => {
-  const rooms = [
-    { name: "KITCHEN", position: [6, -1.4, 7], scale: 0.7 },
-    { name: "BATHROOM", position: [0, -1.4, 7], scale: 0.5 },
-    { name: "INVENTORY", position: [-6, -1.4, -13.2], scale: 0.6 },
-    { name: "ROOM1", position: [8.5, -1.4, -5], scale: 1.5 },
-    { name: "LIVING ROOM", position: [-6, -1.4, -5.5], scale: 1.7 },
-    { name: "LOBBY", position: [-6, -1.4, 8], scale: 2 },
-    { name: "ROOM2", position: [8.5, -1.4, 1.6], scale: 1.2 },
-    { name: "ROOM3", position: [2.5, -1.4, -10.6], scale: 1.3 },
-  ];
+  const roomConfigs = useSelector(selectRoomConfigs100M);
 
-  return rooms.map((room, index) => (
+  // Create labels dynamically based on room configurations
+  const roomLabels = Object.entries(roomConfigs).map(([roomName, config]) => ({
+    name: roomName,
+    position: [
+      config.position[0],
+      config.position[1] + 0.2, // Slightly above the floor
+      config.position[2],
+    ],
+    // Scale based on room size for better visibility
+    scale: Math.min(Math.max(0.5, (config.size[0] + config.size[1]) / 20), 2.0),
+  }));
+
+  return roomLabels.map((room, index) => (
     <Text
       key={index}
       position={room.position}
