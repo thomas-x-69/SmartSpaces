@@ -58,38 +58,6 @@ const FurnitureHoverMenu = ({
   );
 };
 
-const RoomPlacementPlane = ({ config, name }) => {
-  const planeGeometry = new THREE.PlaneGeometry(config.size[0], config.size[1]);
-  const planeMaterial = new THREE.MeshStandardMaterial({
-    color: config.color,
-    transparent: true,
-    opacity: 0.2,
-    side: THREE.DoubleSide,
-  });
-
-  return (
-    <mesh
-      geometry={planeGeometry}
-      material={planeMaterial}
-      position={config.position}
-      rotation={[-Math.PI / 2, 0, 0]}
-      userData={{ roomName: name }}
-      receiveShadow
-    >
-      <Text
-        position={[0, 0, 0.01]}
-        rotation={[Math.PI / 2, 0, 0]}
-        fontSize={0.5}
-        color={config.color}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {name}
-      </Text>
-    </mesh>
-  );
-};
-
 const loadModel = async (path, gltfLoader, fbxLoader) => {
   const extension = path.split(".").pop().toLowerCase();
 
@@ -290,10 +258,15 @@ const FurnitureManager = ({ selectedFurniture, homeRef, homeType = "50m" }) => {
       }
     }
 
+    // Check collision with house model only if it's visual collision (not position-dependent)
     if (homeRef.current) {
       const homeMeshes = [];
       homeRef.current.traverse((child) => {
-        if (child.isMesh && !child.userData?.type?.includes("roomLabel")) {
+        if (
+          child.isMesh &&
+          !child.userData?.type?.includes("roomLabel") &&
+          !child.userData?.isVisualOnly
+        ) {
           homeMeshes.push(child);
         }
       });
@@ -316,7 +289,8 @@ const FurnitureManager = ({ selectedFurniture, homeRef, homeType = "50m" }) => {
         ? `/src/assets/models/furniture_FBX/${selectedFurniture}.glb`
         : `/src/assets/models/furniture/${selectedFurniture}.glb`;
 
-      loadingPosition.current.set(is100M ? 0 : -1.3, 0, 0);
+      // Set loading position to world center, independent of house model
+      loadingPosition.current.set(0, 0, 0);
       setIsInitialLoad(true);
       setIsLoading(true);
 
@@ -358,7 +332,7 @@ const FurnitureManager = ({ selectedFurniture, homeRef, homeType = "50m" }) => {
           setIsLoading(false);
         });
     }
-  }, [selectedFurniture, scene, is100M]);
+  }, [selectedFurniture, scene]);
 
   useEffect(() => {
     const handleMouseMove = (event) => {

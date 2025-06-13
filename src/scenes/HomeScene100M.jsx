@@ -12,12 +12,7 @@ import {
   updateRoomSize,
   updateRoomPosition,
 } from "../store/roomConfigs100MSlice";
-import { updateRoomCapacity } from "../store/humanSlice";
-import {
-  WIDTH_MULTIPLIER_100M,
-  DEPTH_MULTIPLIER_100M,
-  AREA_DIVISOR_100M,
-} from "../constants/roomConstants100M";
+import { updateRoomCapacity } from "../store/humanSlice100M";
 
 // Component Imports
 import House100M from "../components/House100M";
@@ -30,30 +25,29 @@ const HomeScene100M = forwardRef(
     const roomConfigs = useSelector(selectRoomConfigs100M);
     const dispatch = useDispatch();
 
-    // Wall positions for 100M home - 2 walls as specified
+    // Wall positions for 100M home - completely independent of house model
     const wallPositions = [
       {
         id: "wall100m_1",
-        position: [0.5, -0.3, 8], // Between room1 and room2 area
+        position: [12, -0.3, 5], // Between room1 and room2 area
         rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
         scale: [0.75, 0.818, 0.9],
-        initialX: 0.5,
-        initialZ: 8,
+        initialX: 12,
+        initialZ: 5,
       },
       {
         id: "wall100m_2",
-        position: [2, -0.3, 4], // Between lobby and living room
+        position: [0, -0.3, 8], // Between lobby and living room
         rotation: [0, 0, 0],
         scale: [0.75, 0.818, 0.9],
-        initialX: 2,
-        initialZ: 4,
+        initialX: 0,
+        initialZ: 8,
       },
     ];
 
     // Handle wall movement completion
     const handleWallMoveComplete = (wallId, finalPosition) => {
       // Only update room sizes/positions when walls are actually moved by user
-      // Not when house model is moved
       if (!isEditingRooms) return;
 
       console.log("Wall move complete:", { wallId, finalPosition });
@@ -187,8 +181,8 @@ const HomeScene100M = forwardRef(
 
     return (
       <>
-        {/* HOUSE 3D MODEL - Completely separate group */}
-        <group>
+        {/* HOUSE 3D MODEL - Completely isolated group */}
+        <group position={[0, 0, 0]}>
           <Suspense fallback={null}>
             <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
             <ambientLight intensity={0.2} />
@@ -213,7 +207,7 @@ const HomeScene100M = forwardRef(
               contactShadow={{ blur: 2, opacity: 0.5 }}
               shadowBias={-0.0015}
             >
-              {/* ONLY the house 3D model is in Stage - can be moved independently */}
+              {/* ONLY the house 3D model - its position changes don't affect anything else */}
               <House100M showCeiling={showCeiling} />
             </Stage>
 
@@ -228,9 +222,9 @@ const HomeScene100M = forwardRef(
           </Suspense>
         </group>
 
-        {/* ROOM PLANS - Completely independent group at world coordinates */}
-        <group ref={ref}>
-          {/* Walls - independent of house */}
+        {/* ROOM LAYOUT SYSTEM - Completely independent at world coordinates */}
+        <group ref={ref} position={[0, 0, 0]}>
+          {/* Walls - using independent world coordinates */}
           {wallPositions.map((wallProps) => (
             <Wall
               key={wallProps.id}
@@ -243,9 +237,9 @@ const HomeScene100M = forwardRef(
             />
           ))}
 
-          {/* Labels and occupancy - completely independent at world coordinates */}
+          {/* Labels and occupancy - using consistent world coordinates */}
           <RoomLabels100M />
-          {showOccupancy && <RoomOccupancy100M roomOccupants={{}} />}
+          {showOccupancy && <RoomOccupancy100M />}
         </group>
       </>
     );

@@ -3,7 +3,7 @@ import React from "react";
 import { Html } from "@react-three/drei";
 import { useSelector } from "react-redux";
 import { Users, AlertCircle } from "lucide-react";
-import { selectRoomOccupancy } from "../store/humanSlice";
+import { selectRoomOccupancy100M } from "../store/humanSlice100M";
 import { selectRoomConfigs100M } from "../store/roomConfigs100MSlice";
 
 const SPACE_PER_PERSON = 3.0; // 1 person per 3m²
@@ -75,19 +75,7 @@ const OccupancyDisplay = ({ roomName, data, currentCount, position }) => {
 
 const RoomOccupancy100M = ({ homeRef }) => {
   const roomConfigs = useSelector(selectRoomConfigs100M);
-  const humanRoomOccupancy = useSelector(selectRoomOccupancy);
-
-  // Independent occupancy display positions - only display is at 0,0,0 from its label
-  const occupancyPositions = {
-    KITCHEN: [-20, 1.2, -6], // Independent position (0,0,0 from label at [-5, 0.4, -6])
-    BATHROOM: [8, 1.2, -6], // Independent position (0,0,0 from label at [8, 0.4, -6])
-    INVENTORY: [-10, 1.2, 2], // Independent position (0,0,0 from label at [-10, 0.4, 2])
-    ROOM1: [-1, 1.2, 10], // Independent position (0,0,0 from label at [-1, 0.4, 10])
-    "LIVING ROOM": [6, 1.2, 10], // Independent position (0,0,0 from label at [6, 0.4, 10])
-    LOBBY: [2, 1.2, 2], // Independent position (0,0,0 from label at [2, 0.4, 2])
-    ROOM2: [9, 1.2, 0], // Independent position (0,0,0 from label at [9, 0.4, 0])
-    ROOM3: [-4, 1.2, 7], // Independent position (0,0,0 from label at [-4, 0.4, 7])
-  };
+  const humanRoomOccupancy = useSelector(selectRoomOccupancy100M);
 
   return (
     <group>
@@ -105,9 +93,12 @@ const RoomOccupancy100M = ({ homeRef }) => {
           area: area,
         };
 
-        // Use independent occupancy position
-        const position = occupancyPositions[roomName];
-        if (!position) return null;
+        // Use room config position + offset for occupancy display
+        const position = [
+          config.position[0],
+          config.position[1] + 2.2, // Show above the room
+          config.position[2],
+        ];
 
         return (
           <OccupancyDisplay

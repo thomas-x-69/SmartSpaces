@@ -153,11 +153,15 @@ const HumanManager = ({
       }
     }
 
-    // Check collisions with furniture and house geometry
+    // Check collisions with furniture and house geometry (but not position-dependent)
     if (homeRef.current) {
       const homeMeshes = [];
       homeRef.current.traverse((child) => {
-        if (child.isMesh && !child.userData?.type?.includes("roomLabel")) {
+        if (
+          child.isMesh &&
+          !child.userData?.type?.includes("roomLabel") &&
+          !child.userData?.isVisualOnly
+        ) {
           homeMeshes.push(child);
         }
       });
@@ -177,7 +181,8 @@ const HumanManager = ({
   useEffect(() => {
     if (isPlacingHuman && !previewMesh.current) {
       const modelPath = "/src/assets/models/human/Human.glb";
-      loadingPosition.current.set(is100M ? 0 : -1.3, 0, 0);
+      // Set loading position to world center, independent of house model
+      loadingPosition.current.set(0, 0, 0);
       setIsLoading(true);
 
       gltfLoader.current.load(
@@ -211,7 +216,7 @@ const HumanManager = ({
         }
       );
     }
-  }, [isPlacingHuman, scene, is100M]);
+  }, [isPlacingHuman, scene]);
 
   // Handle human hover interactions
   const handleHumanHover = (event) => {
