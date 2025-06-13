@@ -33,6 +33,7 @@ const Wall = ({
   const [currentPosition, setCurrentPosition] = useState(
     new THREE.Vector3(...position)
   );
+  const [initialPosition] = useState(new THREE.Vector3(...position)); // Track initial position
   const raycaster = useRef(new THREE.Raycaster());
   const dragPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
   const [isHovered, setIsHovered] = useState(false);
@@ -129,10 +130,8 @@ const Wall = ({
         setIsDragging(true);
 
         // Set cursor based on wall movement direction
-        if (is100MWall && id === "wall100m_1") {
-          gl.domElement.style.cursor = "ns-resize"; // vertical movement
-        } else if (is100MWall) {
-          gl.domElement.style.cursor = "ew-resize"; // horizontal movement
+        if (is100MWall) {
+          gl.domElement.style.cursor = "ns-resize"; // Both 100M walls move vertically
         } else {
           gl.domElement.style.cursor = "ew-resize"; // 50M walls move horizontally
         }
@@ -160,12 +159,10 @@ const Wall = ({
         setIsHovered(intersects.length > 0);
 
         if (intersects.length > 0) {
-          if (is100MWall && id === "wall100m_1") {
-            gl.domElement.style.cursor = "ns-resize";
-          } else if (is100MWall) {
-            gl.domElement.style.cursor = "ew-resize";
+          if (is100MWall) {
+            gl.domElement.style.cursor = "ns-resize"; // Both 100M walls move vertically
           } else {
-            gl.domElement.style.cursor = "ew-resize";
+            gl.domElement.style.cursor = "ew-resize"; // 50M walls move horizontally
           }
         } else {
           gl.domElement.style.cursor = "default";
@@ -196,15 +193,15 @@ const Wall = ({
           const maxZ = position[2] + maxOffset;
           newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
         } else if (id === "wall100m_2") {
-          // Wall between lobby and living room - allow X movement (horizontal)
+          // Wall between lobby and living room - ALSO allow Z movement (vertical) like wall1
           newPosition = new THREE.Vector3(
-            intersectPoint.x,
+            currentPosition.x,
             currentPosition.y,
-            currentPosition.z
+            intersectPoint.z
           );
-          const minX = position[0] - maxOffset;
-          const maxX = position[0] + maxOffset;
-          newPosition.x = Math.max(minX, Math.min(maxX, newPosition.x));
+          const minZ = position[2] - maxOffset;
+          const maxZ = position[2] + maxOffset;
+          newPosition.z = Math.max(minZ, Math.min(maxZ, newPosition.z));
         }
       } else {
         // 50M walls - original behavior (X movement)
@@ -238,18 +235,20 @@ const Wall = ({
         setCollisionInfo(null);
 
         if (isHovered) {
-          if (is100MWall && id === "wall100m_1") {
-            gl.domElement.style.cursor = "ns-resize";
-          } else if (is100MWall) {
-            gl.domElement.style.cursor = "ew-resize";
+          if (is100MWall) {
+            gl.domElement.style.cursor = "ns-resize"; // Both 100M walls move vertically
           } else {
-            gl.domElement.style.cursor = "ew-resize";
+            gl.domElement.style.cursor = "ew-resize"; // 50M walls move horizontally
           }
         } else {
           gl.domElement.style.cursor = "default";
         }
 
-        onMoveComplete?.(currentPosition);
+        // ONLY call onMoveComplete if wall actually moved from initial position
+        const threshold = 0.01;
+        if (currentPosition.distanceTo(initialPosition) > threshold) {
+          onMoveComplete?.(currentPosition);
+        }
       }
     };
 

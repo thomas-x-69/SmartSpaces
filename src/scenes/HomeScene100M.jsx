@@ -12,12 +12,7 @@ import {
   updateRoomSize,
   updateRoomPosition,
 } from "../store/roomConfigs100MSlice";
-import { updateRoomCapacity } from "../store/humanSlice";
-import {
-  WIDTH_MULTIPLIER_100M,
-  DEPTH_MULTIPLIER_100M,
-  AREA_DIVISOR_100M,
-} from "../constants/roomConstants100M";
+import { updateRoomCapacity } from "../store/humanSlice100M";
 
 // Component Imports
 import House100M from "../components/House100M";
@@ -30,32 +25,28 @@ const HomeScene100M = forwardRef(
     const roomConfigs = useSelector(selectRoomConfigs100M);
     const dispatch = useDispatch();
 
-    // Wall positions for 100M home - 2 walls as specified
+    // Wall positions for 100M home - ORIGINAL positions
     const wallPositions = [
       {
         id: "wall100m_1",
         position: [-13.2, -2.2, -2.2], // Between room1 and room2 area
         rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
         scale: [0.5, 0.818, 2.1],
-        initialX: 12,
-        initialZ: 5,
+        initialX: -13.2,
+        initialZ: -2.2,
       },
       {
         id: "wall100m_2",
         position: [-20.8, -2.2, -1.05], // Between room1 and room2 area
         rotation: [0, Math.PI / 2, 0], // Rotated 90 degrees
         scale: [1, 0.818, 1.8],
-        initialX: 0,
-        initialZ: 8,
+        initialX: -20.8,
+        initialZ: -1.05,
       },
     ];
 
-    // Handle wall movement completion
+    // Handle wall movement completion - ORIGINAL logic
     const handleWallMoveComplete = (wallId, finalPosition) => {
-      // Only update room sizes/positions when walls are actually moved by user
-      // Not when house model is moved
-      if (!isEditingRooms) return;
-
       console.log("Wall move complete:", { wallId, finalPosition });
       const wallConfig = wallPositions.find((w) => w.id === wallId);
       if (!wallConfig) return;
@@ -131,16 +122,16 @@ const HomeScene100M = forwardRef(
           })
         );
       } else if (wallId === "wall100m_2") {
-        // Wall between lobby and living room - adjust horizontally (width)
-        const movementDelta = (finalPosition.x - wallConfig.initialX) * 0.5;
+        // Wall between lobby and living room - adjust VERTICALLY like wall1 (depth)
+        const movementDelta = (finalPosition.z - wallConfig.initialZ) * 0.5;
 
         const newLobbySize = [
-          Math.max(4, roomConfigs.LOBBY.size[0] - movementDelta),
-          roomConfigs.LOBBY.size[1],
+          roomConfigs.LOBBY.size[0], // width stays the same
+          Math.max(4, roomConfigs.LOBBY.size[1] - movementDelta), // depth changes
         ];
         const newLivingRoomSize = [
-          Math.max(4, roomConfigs["LIVING ROOM"].size[0] + movementDelta),
-          roomConfigs["LIVING ROOM"].size[1],
+          roomConfigs["LIVING ROOM"].size[0], // width stays the same
+          Math.max(4, roomConfigs["LIVING ROOM"].size[1] + movementDelta), // depth changes
         ];
 
         dispatch(
@@ -170,14 +161,14 @@ const HomeScene100M = forwardRef(
           })
         );
 
-        // Update X positions with wall movement (horizontal movement)
+        // Update Z positions with wall movement (vertical movement like wall1)
         dispatch(
           updateRoomPosition({
             roomName: "LOBBY",
             newPosition: [
-              roomConfigs.LOBBY.position[0] - movementDelta * 0.5,
+              roomConfigs.LOBBY.position[0],
               roomConfigs.LOBBY.position[1],
-              roomConfigs.LOBBY.position[2],
+              roomConfigs.LOBBY.position[2] - movementDelta * 0.5,
             ],
           })
         );
@@ -185,9 +176,9 @@ const HomeScene100M = forwardRef(
           updateRoomPosition({
             roomName: "LIVING ROOM",
             newPosition: [
-              roomConfigs["LIVING ROOM"].position[0] + movementDelta * 0.5,
+              roomConfigs["LIVING ROOM"].position[0],
               roomConfigs["LIVING ROOM"].position[1],
-              roomConfigs["LIVING ROOM"].position[2],
+              roomConfigs["LIVING ROOM"].position[2] + movementDelta * 0.5,
             ],
           })
         );
