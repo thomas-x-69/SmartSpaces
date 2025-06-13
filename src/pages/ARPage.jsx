@@ -1,10 +1,19 @@
 // src/pages/ARPage.jsx
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 
 const ARPage = () => {
   const navigate = useNavigate();
+  const { homeType } = useParams();
+
+  // Validate home type
+  useEffect(() => {
+    if (!homeType || (homeType !== "50m" && homeType !== "100m")) {
+      navigate("/");
+      return;
+    }
+  }, [homeType, navigate]);
 
   useEffect(() => {
     // Cleanup function for video resources when component unmounts
@@ -18,6 +27,28 @@ const ARPage = () => {
       }
     };
   }, []);
+
+  // Determine which model to use based on home type
+  const getModelPath = () => {
+    if (homeType === "100m") {
+      return "/src/assets/models/100M-Home/10M.glb";
+    } else {
+      return "/src/assets/models/50M-Home/Templat1.glb";
+    }
+  };
+
+  const getHomeTypeLabel = () => {
+    return homeType === "100m" ? "100M²" : "50M²";
+  };
+
+  const handleBackToDashboard = () => {
+    navigate(`/designer/${homeType}`);
+  };
+
+  // Don't render if invalid home type
+  if (!homeType || (homeType !== "50m" && homeType !== "100m")) {
+    return null;
+  }
 
   return (
     <div className="h-screen w-screen relative">
@@ -33,7 +64,7 @@ const ARPage = () => {
         vr-mode-ui="enabled: false"
       >
         <a-assets>
-          <a-asset-item id="house-model" src=""></a-asset-item>
+          <a-asset-item id="house-model" src={getModelPath()}></a-asset-item>
         </a-assets>
 
         <a-marker
@@ -55,12 +86,12 @@ const ARPage = () => {
           ></a-box> */}
 
           {/* House model - positioned slightly above the marker 
-              We'll adjust these values once we can see the test cube */}
+              Scale and position adjusted based on home type */}
           <a-entity
-            position="0 -.5 0"
-            scale="0.1 0.1 0.1"
+            position="0 -0.5 0"
+            scale={homeType === "100m" ? "0.08 0.08 0.08" : "0.1 0.1 0.1"}
             rotation="40 0 0"
-            gltf-model="/src/assets/models/50M-Home/Templat1.glb"
+            gltf-model={getModelPath()}
           ></a-entity>
         </a-marker>
 
@@ -68,18 +99,18 @@ const ARPage = () => {
       </a-scene>
 
       <div className="fixed top-0 left-0 right-0 z-[10000] bg-black/50 p-4 text-white text-center">
-        point camera at the marker
+        <p>Point camera at the marker</p>
+        <p className="text-sm mt-1 opacity-75">
+          Viewing: {getHomeTypeLabel()} Smart Home
+        </p>
       </div>
 
       <button
-        onClick={() => {
-          navigate("/");
-          window.location.reload(false);
-        }}
+        onClick={handleBackToDashboard}
         className="fixed top-4 left-4 z-[10000] bg-white/90 p-3 rounded-lg shadow-lg hover:bg-white flex items-center gap-2"
       >
         <ArrowLeft className="w-5 h-5" />
-        <span>Back to dashboard</span>
+        <span>Back to {getHomeTypeLabel()} Home</span>
       </button>
 
       <style>{`
@@ -114,8 +145,7 @@ const ARPage = () => {
           position: fixed !important;
           width: 100% !important;
           height: 100% !important;
-                    z-index: 1001 !important;
-
+          z-index: 1001 !important;
           top: 0 !important;
           left: 0 !important;
         }

@@ -24,6 +24,7 @@ const Wall = ({
   isEditMode,
   onMoveComplete,
   onCollisionUpdate,
+  id,
 }) => {
   const { scene, camera, gl } = useThree();
   const { scene: wallScene } = useGLTF(WALL_MODEL);
@@ -39,6 +40,9 @@ const Wall = ({
   const lastValidPosition = useRef(new THREE.Vector3(...position));
   const warningTimeout = useRef(null);
   const [warningPosition, setWarningPosition] = useState(new THREE.Vector3());
+
+  // Determine if this is a 100M wall based on ID
+  const is100MWall = id?.includes("100m");
 
   const showWarning = (type, worldPosition) => {
     setCollisionInfo({ type });
@@ -56,13 +60,21 @@ const Wall = ({
   };
 
   useEffect(() => {
+    // Set initial position and add wall ID to userData
+    if (wallRef.current) {
+      wallRef.current.userData = {
+        isWall: true,
+        id: id,
+      };
+    }
+
     // Cleanup timeout on unmount
     return () => {
       if (warningTimeout.current) {
         clearTimeout(warningTimeout.current);
       }
     };
-  }, []);
+  }, [id]);
 
   const checkObjectCollisions = (newPosition) => {
     if (!wallRef.current) return null;
@@ -115,7 +127,7 @@ const Wall = ({
       );
       if (intersects.length > 0) {
         setIsDragging(true);
-        gl.domElement.style.cursor = "ew-resize";
+        gl.domElement.style.cursor = is100MWall ? "ns-resize" : "ew-resize";
 
         const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
@@ -139,7 +151,11 @@ const Wall = ({
         );
         setIsHovered(intersects.length > 0);
         gl.domElement.style.cursor =
-          intersects.length > 0 ? "ew-resize" : "default";
+          intersects.length > 0
+            ? is100MWall
+              ? "ns-resize"
+              : "ew-resize"
+            : "default";
         return;
       }
 
@@ -151,17 +167,45 @@ const Wall = ({
       const intersectPoint = new THREE.Vector3();
       raycaster.current.ray.intersectPlane(dragPlane.current, intersectPoint);
 
-      const newPosition = new THREE.Vector3(
-        intersectPoint.x,
-        currentPosition.y,
-        currentPosition.z
-      );
-
+      let newPosition;
       const maxOffset = 3;
-      const minX = position[0] - maxOffset;
-      const maxX = position[0] + maxOffset;
 
-      if (newPosition.x >= minX && newPosition.x <= maxX) {
+      if (is100MWall) {
+        // For 100M walls, handle different movement patterns based on wall ID
+        if (id === "wall100m_1") {
+          // Wall between room1 and room2 - allow X movement
+          newPosition = new THREE.Vector3(
+            intersectPoint.x,
+            currentPosition.y,
+            currentPosition.z
+          );
+          const minX = position[0] - maxOffset;
+          const maxX = position[0] + maxOffset;
+          newPosition.x = Math.max(minX, Math.min(maxX, newPosition.x));
+        } else if (id === "wall100m_2") {
+          // Wall between lobby and living room - allow X movement
+          newPosition = new THREE.Vector3(
+            intersectPoint.x,
+            currentPosition.y,
+            currentPosition.z
+          );
+          const minX = position[0] - maxOffset;
+          const maxX = position[0] + maxOffset;
+          newPosition.x = Math.max(minX, Math.min(maxX, newPosition.x));
+        }
+      } else {
+        // 50M walls - original behavior (X movement)
+        newPosition = new THREE.Vector3(
+          intersectPoint.x,
+          currentPosition.y,
+          currentPosition.z
+        );
+        const minX = position[0] - maxOffset;
+        const maxX = position[0] + maxOffset;
+        newPosition.x = Math.max(minX, Math.min(maxX, newPosition.x));
+      }
+
+      if (newPosition) {
         const collision = checkObjectCollisions(newPosition);
         if (collision && !collisionInfo) {
           // Only show warning if not already showing
@@ -179,24 +223,30 @@ const Wall = ({
       if (isDragging) {
         setIsDragging(false);
         setCollisionInfo(null);
-        gl.domElement.style.cursor = isHovered ? "ew-resize" : "default";
+        gl.domElement.style.cursor = isHovered
+          ? is100MWall
+            ? "ns-resize"
+            : "ew-resize"
+          : "default";
         onMoveComplete?.(currentPosition);
       }
     };
 
-    wallRef.current.traverse((child) => {
-      if (child.isMesh) {
-        child.material = child.material.clone();
-        child.material.emissive = new THREE.Color(
-          isDragging ? 0x00ff00 : isHovered ? 0x00aa00 : 0x008800
-        );
-        child.material.emissiveIntensity = isDragging
-          ? 0.8
-          : isHovered
-          ? 0.5
-          : 0.3;
-      }
-    });
+    if (wallRef.current) {
+      wallRef.current.traverse((child) => {
+        if (child.isMesh) {
+          child.material = child.material.clone();
+          child.material.emissive = new THREE.Color(
+            isDragging ? 0x00ff00 : isHovered ? 0x00aa00 : 0x008800
+          );
+          child.material.emissiveIntensity = isDragging
+            ? 0.8
+            : isHovered
+            ? 0.5
+            : 0.3;
+        }
+      });
+    }
 
     const canvas = gl.domElement;
     canvas.addEventListener("pointerdown", handlePointerDown);
@@ -219,6 +269,8 @@ const Wall = ({
     onMoveComplete,
     currentPosition,
     position,
+    is100MWall,
+    id,
   ]);
 
   useEffect(() => {

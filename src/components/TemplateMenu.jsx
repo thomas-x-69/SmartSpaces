@@ -2,13 +2,22 @@
 import { useState, useEffect } from "react";
 import { Save, Trash2, Layout, ArrowLeftFromLine } from "lucide-react";
 
-const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
+const TemplateMenu = ({
+  isOpen,
+  onClose,
+  onLoadTemplate,
+  scene,
+  homeType = "50m",
+}) => {
   const [templates, setTemplates] = useState([]);
   const [templateName, setTemplateName] = useState("");
   const [showError, setShowError] = useState(false);
 
+  // Use different storage keys for different home types
+  const storageKey = `homeTemplates_${homeType}`;
+
   useEffect(() => {
-    const savedTemplates = localStorage.getItem("homeTemplates");
+    const savedTemplates = localStorage.getItem(storageKey);
     if (savedTemplates) {
       try {
         setTemplates(JSON.parse(savedTemplates));
@@ -17,7 +26,7 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
         setTemplates([]);
       }
     }
-  }, []);
+  }, [storageKey]);
 
   const saveTemplate = () => {
     if (!templateName.trim()) {
@@ -32,6 +41,7 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
         furniture: [],
         humans: [],
         walls: [],
+        homeType: homeType, // Store the home type with the template
       };
 
       scene.traverse((object) => {
@@ -61,11 +71,12 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
         name: templateName,
         timestamp: Date.now(),
         objects: savedObjects,
+        homeType: homeType,
       };
 
       const newTemplates = [...templates, sceneTemplate];
       setTemplates(newTemplates);
-      localStorage.setItem("homeTemplates", JSON.stringify(newTemplates));
+      localStorage.setItem(storageKey, JSON.stringify(newTemplates));
       setTemplateName("");
     } catch (error) {
       console.error("Error saving template:", error);
@@ -78,7 +89,7 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
     try {
       const newTemplates = templates.filter((_, i) => i !== index);
       setTemplates(newTemplates);
-      localStorage.setItem("homeTemplates", JSON.stringify(newTemplates));
+      localStorage.setItem(storageKey, JSON.stringify(newTemplates));
     } catch (error) {
       console.error("Error deleting template:", error);
     }
@@ -94,9 +105,13 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
     });
   };
 
+  const getHomeTypeLabel = (type) => {
+    return type === "100m" ? "100M²" : "50M²";
+  };
+
   return (
     <div
-      className={`fixed left-4 top-16 z-40 w-80 bg-black/30 backdrop-blur-2xl text-white 
+      className={`fixed left-4 top-28 z-40 w-80 bg-black/30 backdrop-blur-2xl text-white 
                     shadow-2xl rounded-lg border border-white/10 transition-all duration-300 
                     ${
                       isOpen
@@ -107,9 +122,14 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold bg-gradient-to-r from-white to-white/50 bg-clip-text text-transparent">
-            Save Scene
-          </h2>
+          <div>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-white to-white/50 bg-clip-text text-transparent">
+              Save Scene
+            </h2>
+            <p className="text-sm text-white/60 mt-1">
+              {getHomeTypeLabel(homeType)} Home Templates
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
@@ -166,9 +186,16 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-white/90 truncate">
-                      {template.name}
-                    </h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-white/90 truncate">
+                        {template.name}
+                      </h3>
+                      {template.homeType && (
+                        <span className="text-xs bg-white/10 px-2 py-1 rounded-full text-white/70">
+                          {getHomeTypeLabel(template.homeType)}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-white/50 mt-1">
                       {formatDate(template.timestamp)}
                     </p>
@@ -187,8 +214,17 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
                       onClick={() => onLoadTemplate(template)}
                       className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
                       title="Load Scene"
+                      disabled={
+                        template.homeType && template.homeType !== homeType
+                      }
                     >
-                      <Layout className="w-4 h-4 text-blue-400 group-hover:text-blue-300" />
+                      <Layout
+                        className={`w-4 h-4 ${
+                          template.homeType && template.homeType !== homeType
+                            ? "text-gray-500"
+                            : "text-blue-400 group-hover:text-blue-300"
+                        }`}
+                      />
                     </button>
                     <button
                       onClick={() => deleteTemplate(index)}
@@ -199,6 +235,12 @@ const TemplateMenu = ({ isOpen, onClose, onLoadTemplate, scene }) => {
                     </button>
                   </div>
                 </div>
+                {template.homeType && template.homeType !== homeType && (
+                  <div className="mt-2 text-xs text-yellow-400">
+                    ⚠️ This template is for{" "}
+                    {getHomeTypeLabel(template.homeType)} homes
+                  </div>
+                )}
               </div>
             ))}
           </div>

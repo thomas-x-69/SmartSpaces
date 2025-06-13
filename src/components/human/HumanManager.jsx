@@ -6,12 +6,23 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { Html } from "@react-three/drei";
 import { Move, Trash2, AlertCircle } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
+
+// 50M Home imports
 import {
-  addHuman,
-  removeHuman,
-  selectRoomOccupancy,
+  addHuman as addHuman50M,
+  removeHuman as removeHuman50M,
+  selectRoomOccupancy as selectRoomOccupancy50M,
 } from "../../store/humanSlice";
 import { selectRoomConfigs } from "../../store/roomConfigsSlice";
+
+// 100M Home imports
+import {
+  addHuman as addHuman100M,
+  removeHuman as removeHuman100M,
+  selectRoomOccupancy100M,
+} from "../../store/humanSlice100M";
+import { selectRoomConfigs100M } from "../../store/roomConfigs100MSlice";
+
 import LoadingIndicator from "../../scenes/LoadingIndicator";
 
 // Component for displaying hover menu above humans
@@ -56,11 +67,28 @@ const CapacityWarning = ({ position, message }) => (
   </Html>
 );
 
-const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
+const HumanManager = ({
+  isPlacingHuman,
+  onPlacementComplete,
+  homeRef,
+  homeType = "50m",
+}) => {
   const { scene, gl, camera } = useThree();
   const dispatch = useDispatch();
-  const roomOccupancy = useSelector(selectRoomOccupancy);
-  const roomConfigs = useSelector(selectRoomConfigs);
+
+  // Determine which selectors and actions to use based on home type
+  const is100M = homeType === "100m";
+  const roomOccupancy = useSelector(
+    is100M ? selectRoomOccupancy100M : selectRoomOccupancy50M
+  );
+  const roomConfigs = useSelector(
+    is100M ? selectRoomConfigs100M : selectRoomConfigs
+  );
+
+  // Actions
+  const addHumanAction = is100M ? addHuman100M : addHuman50M;
+  const removeHumanAction = is100M ? removeHuman100M : removeHuman50M;
+
   const mousePosition = useRef(new THREE.Vector2());
   const raycaster = useRef(new THREE.Raycaster());
   const placementPlanes = useRef({});
@@ -76,6 +104,13 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
 
   // Create placement planes for each room
   useEffect(() => {
+    // Clear existing planes
+    Object.values(placementPlanes.current).forEach((plane) => {
+      scene.remove(plane);
+    });
+    placementPlanes.current = {};
+
+    // Create independent placement planes (not affected by house position)
     Object.entries(roomConfigs).forEach(([roomName, config]) => {
       const planeGeometry = new THREE.PlaneGeometry(
         config.size[0],
@@ -87,10 +122,12 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
 
       const plane = new THREE.Mesh(planeGeometry, planeMaterial);
       plane.rotation.x = -Math.PI / 2;
+      // Use room config position directly - independent of house
       plane.position.set(...config.position);
       plane.userData.roomName = roomName;
 
       placementPlanes.current[roomName] = plane;
+      // Add directly to scene root - not to house
       scene.add(plane);
     });
 
@@ -140,7 +177,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
   useEffect(() => {
     if (isPlacingHuman && !previewMesh.current) {
       const modelPath = "/src/assets/models/human/Human.glb";
-      loadingPosition.current.set(-1.3, 0, 0);
+      loadingPosition.current.set(is100M ? 0 : -1.3, 0, 0);
       setIsLoading(true);
 
       gltfLoader.current.load(
@@ -174,7 +211,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
         }
       );
     }
-  }, [isPlacingHuman, scene]);
+  }, [isPlacingHuman, scene, is100M]);
 
   // Handle human hover interactions
   const handleHumanHover = (event) => {
@@ -200,7 +237,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
   const handleDelete = () => {
     if (hoveredHuman) {
       dispatch(
-        removeHuman({
+        removeHumanAction({
           id: hoveredHuman.userData.id,
           room: hoveredHuman.userData.room,
         })
@@ -233,7 +270,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
         });
 
         dispatch(
-          removeHuman({
+          removeHumanAction({
             id: hoveredHuman.userData.id,
             room: hoveredHuman.userData.room,
           })
@@ -298,7 +335,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
           placedHumans.current.push(placedHuman);
 
           dispatch(
-            addHuman({
+            addHumanAction({
               id: humanId,
               position: placedHuman.position.toArray(),
               room: currentRoom,
@@ -323,7 +360,7 @@ const HumanManager = ({ isPlacingHuman, onPlacementComplete, homeRef }) => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("click", handleClick);
     };
-  }, [isPlacing, currentRoom, dispatch, onPlacementComplete]);
+  }, [isPlacing, currentRoom, dispatch, onPlacementComplete, addHumanAction]);
 
   // Cancel placement when isPlacingHuman becomes false
   useEffect(() => {

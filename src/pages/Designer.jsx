@@ -1,11 +1,13 @@
 // src/pages/Designer.jsx
 import { useState, useEffect, Suspense, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter";
 import * as THREE from "three";
 import HomeScene from "../scenes/HomeScene";
+import HomeScene100M from "../scenes/HomeScene100M";
 import LoadingScreen from "../components/LoadingScreen";
 import CameraAnimation from "../components/CameraAnimation";
 import FurnitureMenu from "../components/FurnitureMenu";
@@ -14,13 +16,31 @@ import FurnitureManager from "../components/furniture/FurnitureManager";
 import HumanManager from "../components/human/HumanManager";
 import { useProgress } from "@react-three/drei";
 import { useDispatch, useSelector } from "react-redux";
+
+// 50M Home imports
 import {
-  updateRoomSize,
-  updateRoomPosition,
-  initialState as initialRoomConfigs,
+  updateRoomSize as updateRoomSize50M,
+  updateRoomPosition as updateRoomPosition50M,
+  initialState as initialRoomConfigs50M,
 } from "../store/roomConfigsSlice";
-import { updateRoomCapacity, addHuman } from "../store/humanSlice";
-import { selectRoomOccupancy } from "../store/humanSlice";
+import {
+  updateRoomCapacity as updateRoomCapacity50M,
+  addHuman as addHuman50M,
+  selectRoomOccupancy as selectRoomOccupancy50M,
+} from "../store/humanSlice";
+
+// 100M Home imports
+import {
+  updateRoomSize as updateRoomSize100M,
+  updateRoomPosition as updateRoomPosition100M,
+  initialState as initialRoomConfigs100M,
+} from "../store/roomConfigs100MSlice";
+import {
+  updateRoomCapacity as updateRoomCapacity100M,
+  addHuman as addHuman100M,
+  selectRoomOccupancy100M,
+} from "../store/humanSlice100M";
+
 import {
   Eye,
   EyeOff,
@@ -31,8 +51,8 @@ import {
   MoveHorizontal,
   Save,
   Headset,
+  ArrowLeft,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 const MenuButton = ({
   onClick,
@@ -123,7 +143,7 @@ const exportScene = (scene) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = "home-scene.glb";
+      link.download = `home-scene-${homeType}.glb`;
       link.click();
       URL.revokeObjectURL(url);
     },
@@ -135,9 +155,16 @@ const exportScene = (scene) => {
 };
 
 export default function Designer() {
+  const { homeType } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const roomOccupancy = useSelector(selectRoomOccupancy);
+
+  // Determine which selectors and actions to use based on home type
+  const is100M = homeType === "100m";
+  const roomOccupancy = useSelector(
+    is100M ? selectRoomOccupancy100M : selectRoomOccupancy50M
+  );
+
   const [showOccupancy, setShowOccupancy] = useState(true);
   const [selectedFurniture, setSelectedFurniture] = useState(null);
   const [isPlacingHuman, setIsPlacingHuman] = useState(false);
@@ -152,6 +179,14 @@ export default function Designer() {
   const homeRef = useRef();
   const scene = useRef();
 
+  // Validate home type
+  useEffect(() => {
+    if (!homeType || (homeType !== "50m" && homeType !== "100m")) {
+      navigate("/");
+      return;
+    }
+  }, [homeType, navigate]);
+
   useEffect(() => {
     if (progress === 100) {
       const timer = setTimeout(() => {
@@ -163,6 +198,9 @@ export default function Designer() {
   }, [progress]);
 
   const resetSceneForTemplate = () => {
+    // Only reset when explicitly loading a template, not on app start
+    if (!scene.current) return;
+
     // Clear existing objects
     const furnitureManager = scene.current?.getObjectByName("FurnitureManager");
     const humanManager = scene.current?.getObjectByName("HumanManager");
@@ -184,22 +222,44 @@ export default function Designer() {
     // Reset wall positions to initial state
     const walls = scene.current.children.filter((obj) => obj.userData?.isWall);
     walls.forEach((wall) => {
-      if (wall.userData.id === "wall1" || wall.userData.id === "wall2") {
-        wall.position.set(
-          -0.325,
-          -0.3,
-          wall.userData.id === "wall1" ? -12.9 : -0.8
-        );
-        wall.rotation.set(0, 0, 0);
+      if (is100M) {
+        // Reset 100M walls
+        if (wall.userData.id === "wall100m_1") {
+          wall.position.set(0.5, -0.3, 8);
+          wall.rotation.set(0, Math.PI / 2, 0);
+        } else if (wall.userData.id === "wall100m_2") {
+          wall.position.set(2, -0.3, 4);
+          wall.rotation.set(0, 0, 0);
+        }
+      } else {
+        // Reset 50M walls
+        if (wall.userData.id === "wall1" || wall.userData.id === "wall2") {
+          wall.position.set(
+            -0.325,
+            -0.3,
+            wall.userData.id === "wall1" ? -12.9 : -0.8
+          );
+          wall.rotation.set(0, 0, 0);
+        }
       }
     });
 
-    // Reset Redux states
-    Object.entries(initialRoomConfigs).forEach(([roomName, config]) => {
-      dispatch(updateRoomSize({ roomName, newSize: config.size }));
-      dispatch(updateRoomPosition({ roomName, newPosition: config.position }));
+    // Reset Redux states ONLY for template loading - don't touch room positions
+    const initialConfigs = is100M
+      ? initialRoomConfigs100M
+      : initialRoomConfigs50M;
+    const updateRoomSizeAction = is100M
+      ? updateRoomSize100M
+      : updateRoomSize50M;
+    const updateRoomCapacityAction = is100M
+      ? updateRoomCapacity100M
+      : updateRoomCapacity50M;
+
+    Object.entries(initialConfigs).forEach(([roomName, config]) => {
+      // Only reset sizes and capacities, NOT positions
+      dispatch(updateRoomSizeAction({ roomName, newSize: config.size }));
       dispatch(
-        updateRoomCapacity({
+        updateRoomCapacityAction({
           roomName,
           newConfig: {
             currentOccupancy: 0,
@@ -246,81 +306,7 @@ export default function Designer() {
           if (wallObject) {
             wallObject.position.fromArray(wall.position);
             wallObject.rotation.fromArray(wall.rotation);
-
-            // Update room configs based on wall position
-            if (wall.id === "wall1") {
-              const movementDelta = (wall.position[0] - -0.325) * 0.5;
-
-              dispatch(
-                updateRoomSize({
-                  roomName: "BEDROOM",
-                  newSize: [
-                    6 - movementDelta * 2,
-                    initialRoomConfigs.BEDROOM.size[1],
-                  ],
-                })
-              );
-              dispatch(
-                updateRoomSize({
-                  roomName: "LIVING ROOM",
-                  newSize: [
-                    6 + movementDelta * 2,
-                    initialRoomConfigs["LIVING ROOM"].size[1],
-                  ],
-                })
-              );
-
-              dispatch(
-                updateRoomPosition({
-                  roomName: "BEDROOM",
-                  newPosition: [2.7 + wall.position[0] / 2 + 0.325, -1.54, -6],
-                })
-              );
-              dispatch(
-                updateRoomPosition({
-                  roomName: "LIVING ROOM",
-                  newPosition: [-2.7 + wall.position[0] / 2 - 0.325, -1.54, -6],
-                })
-              );
-            } else if (wall.id === "wall2") {
-              const movementDelta = (wall.position[0] - -0.325) * 0.5;
-
-              dispatch(
-                updateRoomSize({
-                  roomName: "BATHROOM",
-                  newSize: [
-                    6 - movementDelta * 2,
-                    initialRoomConfigs.BATHROOM.size[1],
-                  ],
-                })
-              );
-              dispatch(
-                updateRoomSize({
-                  roomName: "KITCHEN",
-                  newSize: [
-                    6 + movementDelta * 2,
-                    initialRoomConfigs.KITCHEN.size[1],
-                  ],
-                })
-              );
-
-              dispatch(
-                updateRoomPosition({
-                  roomName: "BATHROOM",
-                  newPosition: [2.7 + wall.position[0] / 2 + 0.325, -1.54, 6.1],
-                })
-              );
-              dispatch(
-                updateRoomPosition({
-                  roomName: "KITCHEN",
-                  newPosition: [
-                    -2.7 + wall.position[0] / 2 - 0.325,
-                    -1.54,
-                    6.1,
-                  ],
-                })
-              );
-            }
+            // Wall handling logic would be different for 100M vs 50M
           }
         }
       }
@@ -395,9 +381,10 @@ export default function Designer() {
 
             humanGroup.add(model);
 
-            // Update Redux state for human
+            // Update Redux state for human using appropriate action
+            const addHumanAction = is100M ? addHuman100M : addHuman50M;
             dispatch(
-              addHuman({
+              addHumanAction({
                 id: `human_${Date.now()}_${Math.random()}`,
                 position: human.position,
                 rotation: human.rotation,
@@ -411,23 +398,27 @@ export default function Designer() {
       }
 
       // Update room occupancy after loading humans
-      const rooms = ["BEDROOM", "LIVING ROOM", "KITCHEN", "BATHROOM", "LOBBY"];
-      rooms.forEach((roomName) => {
+      const initialConfigs = is100M
+        ? initialRoomConfigs100M
+        : initialRoomConfigs50M;
+      const updateRoomCapacityAction = is100M
+        ? updateRoomCapacity100M
+        : updateRoomCapacity50M;
+
+      Object.keys(initialConfigs).forEach((roomName) => {
         const humansInRoom = humanGroup.children.filter(
           (human) => human.userData.room === roomName
         );
 
         if (humansInRoom.length > 0) {
           dispatch(
-            updateRoomCapacity({
+            updateRoomCapacityAction({
               roomName,
               newConfig: {
                 currentOccupancy: humansInRoom.length,
                 humanIds: humansInRoom.map((h) => h.uuid),
-                maxCapacity: Math.floor(
-                  initialRoomConfigs[roomName].area / 2.5
-                ),
-                area: initialRoomConfigs[roomName].area,
+                maxCapacity: Math.floor(initialConfigs[roomName].area / 2.5),
+                area: initialConfigs[roomName].area,
               },
             })
           );
@@ -467,8 +458,17 @@ export default function Designer() {
   };
 
   const handleARViewTransition = () => {
-    navigate("/ar");
+    navigate(`/ar/${homeType}`);
   };
+
+  const handleBackToSelection = () => {
+    navigate("/");
+  };
+
+  // Don't render if invalid home type
+  if (!homeType || (homeType !== "50m" && homeType !== "100m")) {
+    return null;
+  }
 
   return (
     <>
@@ -479,20 +479,16 @@ export default function Designer() {
           showScene ? "opacity-100" : "opacity-0"
         }`}
       >
-        {/* Add Furniture Button */}
-        <button
-          onClick={() => setIsExpanded(true)}
-          className={`absolute left-4 top-4 z-20 bg-gradient-to-r from-blue-500 to-cyan-500 
-                     text-white px-6 py-2 rounded-lg shadow-lg hover:shadow-xl 
-                     transition-all duration-300 hover:scale-105 active:scale-95
-                     ${
-                       isExpanded
-                         ? "opacity-0 pointer-events-none"
-                         : "opacity-100"
-                     }`}
-        >
-          Add Furniture
-        </button>
+        {/* Home Type Indicator */}
+        <div className="absolute top-4 left-4 z-30 flex items-center gap-4">
+          <button
+            onClick={handleBackToSelection}
+            className="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>{is100M ? "100M²" : "50M²"} Home</span>
+          </button>
+        </div>
 
         {/* Main Menu Controls */}
         <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
@@ -540,7 +536,7 @@ export default function Designer() {
         </div>
 
         {/* Add Template Menu Button */}
-        <div className="absolute left-4 top-16 z-30">
+        <div className="absolute left-4 top-28 z-30">
           <MenuButton
             onClick={() => setShowTemplateMenu(!showTemplateMenu)}
             icon={Save}
@@ -556,6 +552,7 @@ export default function Designer() {
           onClose={() => setShowTemplateMenu(false)}
           onLoadTemplate={handleLoadTemplate}
           scene={scene.current}
+          homeType={homeType}
         />
 
         {/* Furniture Menu */}
@@ -585,36 +582,42 @@ export default function Designer() {
           </div>
         </div>
 
-        {/* AR View */}
-        {showARView ? (
-          <ARView onClose={() => setShowARView(false)} />
-        ) : (
-          /* 3D Scene */
-          <Canvas
-            shadows
-            gl={{
-              antialias: true,
-              toneMapping: THREE.ACESFilmicToneMapping,
-              toneMappingExposure: 1.2,
-              outputEncoding: THREE.sRGBEncoding,
-              shadowMap: {
-                enabled: true,
-                type: THREE.PCFSoftShadowMap,
-                basicShadowMap: false,
-              },
-            }}
-            camera={{
-              position: [2, 1, 2],
-              fov: 45,
-              near: 0.1,
-              far: 1000,
-            }}
-            dpr={[1, 2]}
-            onCreated={({ scene: threeScene }) => {
-              scene.current = threeScene;
-            }}
-          >
-            <Suspense fallback={null}>
+        {/* 3D Scene */}
+        <Canvas
+          shadows
+          gl={{
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.2,
+            outputEncoding: THREE.sRGBEncoding,
+            shadowMap: {
+              enabled: true,
+              type: THREE.PCFSoftShadowMap,
+              basicShadowMap: false,
+            },
+          }}
+          camera={{
+            position: is100M ? [3, 2, 3] : [2, 1, 2],
+            fov: 45,
+            near: 0.1,
+            far: 1000,
+          }}
+          dpr={[1, 2]}
+          onCreated={({ scene: threeScene }) => {
+            scene.current = threeScene;
+          }}
+        >
+          <Suspense fallback={null}>
+            {is100M ? (
+              <HomeScene100M
+                ref={homeRef}
+                showOccupancy={showOccupancy}
+                isEditingRooms={isEditingRooms}
+                onSurfacesDetected={(surfaces) => {
+                  console.log("Surfaces detected:", surfaces);
+                }}
+              />
+            ) : (
               <HomeScene
                 ref={homeRef}
                 showOccupancy={showOccupancy}
@@ -623,34 +626,36 @@ export default function Designer() {
                   console.log("Surfaces detected:", surfaces);
                 }}
               />
-              <FurnitureManager
-                selectedFurniture={selectedFurniture}
-                homeRef={homeRef}
-              />
-              <HumanManager
-                isPlacingHuman={isPlacingHuman}
-                onPlacementComplete={handleHumanPlacementComplete}
-                homeRef={homeRef}
-              />
-              <CameraAnimation
-                isLoading={!showScene}
-                onAnimationComplete={() => setControlsEnabled(true)}
-              />
-              <OrbitControls
-                makeDefault
-                enabled={controlsEnabled && !isEditingRooms}
-                minDistance={2}
-                maxDistance={20}
-                maxPolarAngle={Math.PI / 2}
-                enableDamping
-                dampingFactor={0.05}
-                rotateSpeed={1}
-                zoomSpeed={1}
-                target={new THREE.Vector3(-1.3, 0, 0)}
-              />
-            </Suspense>
-          </Canvas>
-        )}
+            )}
+            <FurnitureManager
+              selectedFurniture={selectedFurniture}
+              homeRef={homeRef}
+              homeType={homeType}
+            />
+            <HumanManager
+              isPlacingHuman={isPlacingHuman}
+              onPlacementComplete={handleHumanPlacementComplete}
+              homeRef={homeRef}
+              homeType={homeType}
+            />
+            <CameraAnimation
+              isLoading={!showScene}
+              onAnimationComplete={() => setControlsEnabled(true)}
+            />
+            <OrbitControls
+              makeDefault
+              enabled={controlsEnabled && !isEditingRooms}
+              minDistance={2}
+              maxDistance={is100M ? 25 : 20}
+              maxPolarAngle={Math.PI / 2}
+              enableDamping
+              dampingFactor={0.05}
+              rotateSpeed={1}
+              zoomSpeed={1}
+              target={new THREE.Vector3(is100M ? 0 : -1.3, 0, 0)}
+            />
+          </Suspense>
+        </Canvas>
       </div>
     </>
   );

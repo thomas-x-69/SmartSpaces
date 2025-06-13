@@ -1,3 +1,4 @@
+// src/components/furniture/FurnitureManager.jsx
 import { useEffect, useRef, useState } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -7,6 +8,7 @@ import { Html, Text } from "@react-three/drei";
 import { RotateCw, Move, Trash2 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { selectRoomConfigs } from "../../store/roomConfigsSlice";
+import { selectRoomConfigs100M } from "../../store/roomConfigs100MSlice";
 import LoadingIndicator from "../../scenes/LoadingIndicator";
 
 const FurnitureHoverMenu = ({
@@ -107,7 +109,7 @@ const loadModel = async (path, gltfLoader, fbxLoader) => {
   }
 };
 
-const FurnitureManager = ({ selectedFurniture, homeRef }) => {
+const FurnitureManager = ({ selectedFurniture, homeRef, homeType = "50m" }) => {
   const { scene, gl, camera } = useThree();
   const mousePosition = useRef(new THREE.Vector2());
   const raycaster = useRef(new THREE.Raycaster());
@@ -123,9 +125,22 @@ const FurnitureManager = ({ selectedFurniture, homeRef }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(false);
   const loadingPosition = useRef(new THREE.Vector3());
-  const roomConfigs = useSelector(selectRoomConfigs);
+
+  // Use appropriate room configs based on home type
+  const is100M = homeType === "100m";
+  const roomConfigs = useSelector(
+    is100M ? selectRoomConfigs100M : selectRoomConfigs
+  );
 
   useEffect(() => {
+    // Clear any existing planes first
+    Object.values(placementPlanes.current).forEach((plane) => {
+      scene.remove(plane);
+    });
+    placementPlanes.current = {};
+
+    // Create room placement planes at ABSOLUTE world coordinates
+    // Completely independent of house position/size/transforms
     Object.entries(roomConfigs).forEach(([roomName, config]) => {
       const planeGeometry = new THREE.PlaneGeometry(
         config.size[0],
@@ -140,18 +155,28 @@ const FurnitureManager = ({ selectedFurniture, homeRef }) => {
 
       const plane = new THREE.Mesh(planeGeometry, planeMaterial);
       plane.rotation.x = -Math.PI / 2;
-      plane.position.set(...config.position);
+      // Set position directly from config - NO inheritance from house
+      plane.position.set(
+        config.position[0],
+        config.position[1],
+        config.position[2]
+      );
       plane.userData.roomName = roomName;
       plane.receiveShadow = true;
 
+      // Store reference
       placementPlanes.current[roomName] = plane;
+
+      // Add directly to scene root - NOT to any house group
       scene.add(plane);
     });
 
     return () => {
+      // Clean up on unmount
       Object.values(placementPlanes.current).forEach((plane) => {
         scene.remove(plane);
       });
+      placementPlanes.current = {};
     };
   }, [scene, roomConfigs]);
 
@@ -291,7 +316,7 @@ const FurnitureManager = ({ selectedFurniture, homeRef }) => {
         ? `/src/assets/models/furniture_FBX/${selectedFurniture}.glb`
         : `/src/assets/models/furniture/${selectedFurniture}.glb`;
 
-      loadingPosition.current.set(-1.3, 0, 0);
+      loadingPosition.current.set(is100M ? 0 : -1.3, 0, 0);
       setIsInitialLoad(true);
       setIsLoading(true);
 
@@ -333,7 +358,7 @@ const FurnitureManager = ({ selectedFurniture, homeRef }) => {
           setIsLoading(false);
         });
     }
-  }, [selectedFurniture, scene]);
+  }, [selectedFurniture, scene, is100M]);
 
   useEffect(() => {
     const handleMouseMove = (event) => {
